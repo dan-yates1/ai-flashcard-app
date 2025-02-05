@@ -1,109 +1,162 @@
-import { StyleSheet, Image, Platform } from 'react-native';
-
-import { Collapsible } from '@/components/Collapsible';
-import { ExternalLink } from '@/components/ExternalLink';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
+import { useState, useEffect } from 'react';
+import { StyleSheet, FlatList, View, ScrollView } from 'react-native';
+import { Searchbar, Chip, IconButton } from 'react-native-paper';
+import { router } from 'expo-router';
+import { database } from '@/lib/database';
 import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+import { ThemedText } from '@/components/ThemedText';
+import { FlashcardSet } from '@/components/FlashcardSet';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { theme } from '@/theme';
+import type { FlashcardSet as FlashcardSetType } from '@/types/database';
 
-export default function TabTwoScreen() {
+const CATEGORIES = [
+  'Languages',
+  'Science',
+  'Math',
+  'History',
+  'Arts',
+  'Technology',
+];
+
+export default function ExploreScreen() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [publicSets, setPublicSets] = useState<FlashcardSetType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    loadPublicSets();
+  }, []);
+
+  const loadPublicSets = async () => {
+    try {
+      setLoading(true);
+      const data = await database.flashcardSets.listPublic();
+      setPublicSets(data);
+    } catch (error) {
+      console.error('Error loading public sets:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredSets = publicSets.filter(set => 
+    set.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (set.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image source={require('@/assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Custom fonts">
-        <ThemedText>
-          Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-          <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-            custom fonts such as this one.
-          </ThemedText>
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user's current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
+    <ThemedView style={styles.container}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <View style={styles.searchContainer}>
+          <Searchbar
+            placeholder="Search study sets"
+            onChangeText={setSearchQuery}
+            value={searchQuery}
+            style={styles.searchBar}
+            inputStyle={styles.searchInput}
+            iconColor={theme.colors.textSecondary}
+          />
+        </View>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoriesContainer}
+          contentContainerStyle={styles.categories}
+        >
+          {CATEGORIES.map(category => (
+            <Chip
+              key={category}
+              selected={selectedCategory === category}
+              onPress={() => setSelectedCategory(
+                selectedCategory === category ? null : category
+              )}
+              style={styles.chip}
+              textStyle={styles.chipText}
+            >
+              {category}
+            </Chip>
+          ))}
+        </ScrollView>
+      </View>
+
+      <FlatList
+        data={filteredSets}
+        renderItem={({ item }) => (
+          <FlashcardSet
+            set={item}
+            onPress={() => router.push(`/sets/${item.id}`)}
+          />
+        )}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <IconButton
+              icon="magnify"
+              size={48}
+              iconColor={theme.colors.textSecondary}
+            />
+            <ThemedText style={styles.emptyText}>
+              No sets found
             </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+          </View>
+        }
+      />
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  header: {
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  searchContainer: {
+    padding: theme.spacing.md,
+  },
+  searchBar: {
+    elevation: 0,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  searchInput: {
+    fontSize: 16,
+  },
+  categoriesContainer: {
+    marginBottom: theme.spacing.md,
+  },
+  categories: {
+    paddingHorizontal: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  chip: {
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  chipText: {
+    color: theme.colors.text,
+  },
+  list: {
+    padding: theme.spacing.md,
+  },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.xl,
+  },
+  emptyText: {
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.sm,
   },
 });
